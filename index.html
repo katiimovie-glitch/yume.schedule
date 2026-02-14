@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>和太鼓 練習管理 - 爆速入力版</title>
+<style>
+/* --- 基本レイアウト (画面表示) --- */
+body { font-family: sans-serif; padding: 20px; background-color: #f5f5f5; color: #333; }
+.container { display: flex; gap: 20px; align-items: flex-start; }
+
+.sidebar-left { width: 250px; flex-shrink: 0; }
+.sidebar-middle { width: 250px; flex-shrink: 0; }
+.main-content { flex-grow: 1; min-width: 0; }
+
+.stage-header { background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+.stage-header h1 { margin: 10px 0; font-size: 2.2em; }
+.stage-title-input { font-size: 1.1em; padding: 8px; width: 300px; border: 1px solid #ccc; border-radius: 4px; }
+.date-label { font-size: 1.2em; color: #555; margin-top: 5px; }
+
+.section-card { background: white; padding: 15px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+h2 { font-size: 1.1em; margin-top: 0; border-bottom: 2px solid #eee; padding-bottom: 8px; margin-bottom: 12px; }
+
+/* パーツ共通 */
+.song, .setlist-item {
+  padding: 10px; margin-bottom: 8px; border-radius: 6px;
+  text-align: center; font-weight: bold; position: relative;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  -webkit-print-color-adjust: exact; print-color-adjust: exact;
+}
+.song { cursor: grab; }
+
+/* メンバーチップ */
+.member-chip {
+  display: inline-block; padding: 4px 8px; margin: 2px;
+  background: #eee; border-radius: 12px; font-size: 0.9em;
+  cursor: pointer; border: 1px solid #ddd;
+}
+.member-chip:hover { background: #ddd; }
+
+/* セットリスト */
+.setlist-item { cursor: move; border: 1px solid rgba(0,0,0,0.1); padding-right: 30px; transition: transform 0.1s; }
+.setlist-item.dragging { opacity: 0.5; background: #eee !important; color: #ccc !important; }
+.delete-btn { position: absolute; right: 5px; top: 50%; transform: translateY(-50%); cursor: pointer; background: rgba(0,0,0,0.3); border-radius: 50%; width: 20px; height: 20px; line-height: 18px; font-size: 14px; color: white; border: none; }
+.placeholder-text { color: #999; font-size: 0.85em; text-align: center; padding: 20px; border: 2px dashed #eee; border-radius: 6px; }
+
+/* スケジュール表 */
+.table-wrapper { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); overflow-x: auto; }
+table { border-collapse: collapse; background: white; table-layout: fixed; min-width: 600px; width: 100%; }
+th, td { border: 1px solid #ccc; height: 55px; text-align: center; vertical-align: middle; position: relative; padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+th { background: #f9f9f9; padding: 5px; width: 120px; }
+th:first-child { width: 80px; }
+
+.day-delete-btn { color: #ccc; border: none; background: none; cursor: pointer; font-size: 16px; margin-left: 5px; }
+.day-delete-btn:hover { color: #d33; }
+
+.slot-time { display: block; font-size: 0.75em; font-weight: normal; color: #666; margin-top: 2px; }
+.unavailable { background: repeating-linear-gradient(45deg, #f3f3f3, #f3f3f3 5px, #e9e9e9 5px, #e9e9e9 10px) !important; }
+.song-block { font-weight: bold; height: 100%; width: 100%; display: flex; align-items: center; justify-content: center; cursor: move; box-sizing: border-box; }
+
+/* モーダル */
+.modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 999; }
+.modal { display: none; position: fixed; top: 20%; left: 50%; transform: translateX(-50%); background: white; border-radius: 12px; padding: 25px; z-index: 1000; box-shadow: 0 10px 25px rgba(0,0,0,0.2); min-width: 300px; }
+.btn-save { width: 100%; padding: 10px; background: #444; color: white; border: none; border-radius: 4px; cursor: pointer; }
+
+/* --- 印刷設定 (ズレ解消版) --- */
+@media print {
+  @page { size: landscape; margin: 8mm; }
+  button, input, .no-print, .modal-overlay, .day-delete-btn { display: none !important; }
+  body { padding: 0; background: white; }
+  .container { display: flex; gap: 15px; } /* レイアウト維持 */
+  .sidebar-left { display: none; }
+  .sidebar-middle { width: 180px; flex-shrink: 0; } /* セトリを左に維持 */
+  .main-content { flex-grow: 1; }
+  .section-card { box-shadow: none; border: 1px solid #eee; padding: 8px; margin-bottom: 10px; }
+  .stage-header { box-shadow: none; border: none; margin-bottom: 15px; padding: 0; }
+  .table-wrapper { box-shadow: none; padding: 0; overflow: visible; }
+  
+  /* セルの高さを固定(40px)にすることで、色がハミ出さず、かつ多コマでも収まりやすくする */
+  th, td { height: 40px !important; padding: 0 !important; font-size: 11px !important; }
+  .slot-time { font-size: 9px; }
+  .song-block { border: none; margin: 0; padding: 0; width: 100%; height: 100%; }
+}
+</style>
+</head>
+<body>
+
+<div class="stage-header">
+  <div class="no-print" style="margin-bottom: 15px;">
+    舞台名: <input id="stageNameInput" class="stage-title-input" placeholder="例：夏祭り公演" oninput="updateStageInfo()">
+    本番日: <input type="date" id="eventDateInput" oninput="updateStageInfo()">
+  </div>
+  <h1 id="displayStageName">和太鼓 練習管理</h1>
+  <div id="displayEventDate" class="date-label"></div>
+</div>
+
+<div class="container">
+  <div class="sidebar-left no-print">
+    <div class="section-card">
+      <h2>曲リスト</h2>
+      <div style="display:flex; gap:5px; margin-bottom:10px;">
+        <input id="songInput" placeholder="曲名" style="flex-grow:1;">
+        <button onclick="addSong()">追加</button>
+      </div>
+      <div id="songList"></div>
+    </div>
+    <div class="section-card">
+      <h2>メンバー <span style="font-weight:normal; font-size:0.7em;">(ダブルクリック編集)</span></h2>
+      <div style="display:flex; gap:5px; margin-bottom:10px;">
+        <input id="memberInput" placeholder="名前" style="flex-grow:1;">
+        <button onclick="addMember()">追加</button>
+      </div>
+      <div id="memberList"></div>
+    </div>
+  </div>
+
+  <div class="sidebar-middle">
+    <div class="section-card">
+      <h2>セットリスト</h2>
+      <div id="setlistArea" ondragover="event.preventDefault()" ondrop="dropToSetlist(event)">
+        <div class="placeholder-text no-print">曲リストからドラッグ</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="main-content">
+    <div class="section-card no-print" style="display:flex; gap:10px; align-items:center; flex-wrap: wrap;">
+      <strong>表作成:</strong>
+      開始 <input type="time" id="startTimeInput" value="09:00" onchange="renderTable(); saveData();">
+      日付 <input type="date" id="dateInput">
+      コマ <input type="number" id="slotInput" value="6" min="1" style="width:45px">
+      <button onclick="addPracticeDay()">追加</button>
+      
+      <div style="margin-left:auto; display:flex; gap:5px;">
+        <button onclick="exportJSON()" style="background:#e3f2fd; border:1px solid #90caf9; cursor:pointer; padding:8px 10px; border-radius:4px;">保存</button>
+        <button onclick="document.getElementById('fileInput').click()" style="background:#e3f2fd; border:1px solid #90caf9; cursor:pointer; padding:8px 10px; border-radius:4px;">読込</button>
+        <input type="file" id="fileInput" style="display:none" accept=".json" onchange="importJSON(event)">
+        
+        <button onclick="clearStageInfo()" style="background:#eee; border:1px solid #ccc; cursor:pointer;">舞台/日付消去</button>
+        <button onclick="clearSchedule()" style="background:#fee; border:1px solid #fcc; color:#c33; cursor:pointer;">表をクリア</button>
+        <button onclick="window.print()" style="background:#444; color:white; border:none; padding:8px 15px; border-radius:4px; cursor:pointer;">印刷</button>
+      </div>
+    </div>
+    <div id="tableContainer" class="table-wrapper"></div>
+  </div>
+</div>
+
+<div id="modalOverlay" class="modal-overlay" onclick="closeAllModals()"></div>
+
+<div id="editSongModal" class="modal">
+  <h3>曲編集</h3>
+  <p>曲名: <input id="editSongName" style="width:100%"></p>
+  <p>色: <input id="editSongColor" type="color" style="width:100%; height:40px"></p>
+  <div style="display:flex; gap:10px; margin-top:15px;">
+    <button onclick="saveEditSong()" class="btn-save">保存</button>
+    <button onclick="deleteSong()" style="padding:10px; background:#fee; color:#d33; border:1px solid #fcc; border-radius:4px; cursor:pointer;">削除</button>
+  </div>
+</div>
+
+<div id="editMemberModal" class="modal">
+  <h3>メンバー編集</h3>
+  <p>名前: <input id="editMemberName" style="width:100%"></p>
+  <div style="display:flex; gap:10px; margin-top:15px;">
+    <button onclick="saveEditMember()" class="btn-save">保存</button>
+    <button onclick="deleteMember()" style="padding:10px; background:#fee; color:#d33; border:1px solid #fcc; border-radius:4px; cursor:pointer;">削除</button>
+  </div>
+</div>
+
+<div id="absenceModal" class="modal">
+  <h3>欠席者選択</h3>
+  <div id="absenceList" style="max-height:300px; overflow-y:auto; margin-bottom:15px;"></div>
+  <button onclick="saveAbsence()" class="btn-save">保存</button>
+</div>
+
+<script>
+let songs = [], members = [], setlist = [], practiceDays = [], schedule = {}, absences = {}, maxSlots = 0;
+let dragData = null, currentAbsDate = null, editingSongId = null, editingMemberIndex = null;
+
+const STORAGE_KEY = 'perfectCode2_Data';
+
+window.onload = () => {
+  const saved = localStorage.getItem(STORAGE_KEY);
+  if (saved) loadDataToState(JSON.parse(saved));
+};
+
+function loadDataToState(data) {
+  songs = data.songs || []; members = data.members || [];
+  setlist = data.setlist || []; practiceDays = data.practiceDays || [];
+  schedule = data.schedule || {}; absences = data.absences || {};
+  maxSlots = data.maxSlots || 0;
+  stageNameInput.value = data.stageName || "";
+  eventDateInput.value = data.eventDate || "";
+  startTimeInput.value = data.startTime || "09:00";
+  updateStageInfo(); renderSongs(); renderMembers(); renderSetlist(); renderTable();
+}
+
+function saveData() {
+  const data = { songs, members, setlist, practiceDays, schedule, absences, maxSlots, stageName: stageNameInput.value, eventDate: eventDateInput.value, startTime: startTimeInput.value };
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  return data;
+}
+
+/* --- ファイル保存・読込 --- */
+function exportJSON() {
+  const data = saveData();
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `和太鼓練習_${stageNameInput.value || '無題'}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function importJSON(e) {
+  const file = e.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (event) => {
+    try {
+      const data = JSON.parse(event.target.result);
+      if (confirm("データを上書きして読み込みますか？")) { loadDataToState(data); saveData(); }
+    } catch (err) { alert("失敗しました。"); }
+    e.target.value = "";
+  };
+  reader.readAsText(file);
+}
+
+function updateStageInfo() {
+  displayStageName.textContent = stageNameInput.value.trim() || "和太鼓 練習管理";
+  const date = eventDateInput.value;
+  displayEventDate.textContent = date ? `本番日: ${date.replace(/-/g, '/')}` : "";
+  saveData();
+}
+
+function getTimeRangeString(baseTime, slotIdx) {
+  const [h, m] = baseTime.split(':').map(Number);
+  const start = new Date(); start.setHours(h, m + (slotIdx * 15), 0);
+  const end = new Date(start.getTime() + 15 * 60000);
+  const f = (d) => d.getHours().toString().padStart(2, '0') + ":" + d.getMinutes().toString().padStart(2, '0');
+  return `${f(start)}-${f(end)}`;
+}
+
+/* --- 曲管理 --- */
+function addSong() {
+  const name = songInput.value.trim(); if (!name) return;
+  songs.push({ id: Date.now().toString(), name, color: `hsl(${(songs.length * 75) % 360}, 70%, 50%)` });
+  songInput.value = ""; renderSongs(); saveData();
+}
+function renderSongs() {
+  const list = document.getElementById("songList"); list.innerHTML = "";
+  songs.forEach(s => {
+    const div = document.createElement("div"); div.className = "song"; div.textContent = s.name;
+    div.style.background = s.color; div.style.color = getContrastYIQ(s.color);
+    div.draggable = true; div.ondragstart = () => { dragData = { type: "new", songId: s.id }; };
+    div.ondblclick = () => openEditSong(s.id); list.appendChild(div);
+  });
+}
+function openEditSong(id) {
+  editingSongId = id; const song = songs.find(s => s.id === id);
+  editSongName.value = song.name; editSongColor.value = song.color;
+  editSongModal.style.display = "block"; modalOverlay.style.display = "block";
+}
+function saveEditSong() {
+  const song = songs.find(s => s.id === editingSongId);
+  song.name = editSongName.value; song.color = editSongColor.value;
+  closeAllModals(); renderSongs(); renderSetlist(); renderTable(); saveData();
+}
+function deleteSong() {
+  if (!confirm("この曲をリスト・セトリ・表から完全に削除しますか？")) return;
+  const id = editingSongId;
+  songs = songs.filter(s => s.id !== id);
+  setlist = setlist.filter(sid => sid !== id);
+  Object.keys(schedule).forEach(date => { schedule[date] = schedule[date].map(sid => sid === id ? null : sid); });
+  closeAllModals(); renderSongs(); renderSetlist(); renderTable(); saveData();
+}
+
+/* --- メンバー管理 --- */
+function addMember() {
+  const name = memberInput.value.trim(); if (!name) return;
+  members.push(name); memberInput.value = ""; renderMembers(); saveData();
+}
+function renderMembers() {
+  const list = document.getElementById("memberList"); list.innerHTML = "";
+  members.forEach((m, index) => {
+    const span = document.createElement("span"); span.className = "member-chip";
+    span.textContent = m; span.ondblclick = () => openEditMember(index); list.appendChild(span);
+  });
+}
+function openEditMember(index) {
+  editingMemberIndex = index; editMemberName.value = members[index];
+  editMemberModal.style.display = "block"; modalOverlay.style.display = "block";
+}
+function saveEditMember() {
+  const newName = editMemberName.value.trim(); if (!newName) return;
+  const oldName = members[editingMemberIndex]; members[editingMemberIndex] = newName;
+  Object.keys(absences).forEach(date => {
+    const idx = absences[date].indexOf(oldName); if (idx !== -1) absences[date][idx] = newName;
+  });
+  closeAllModals(); renderMembers(); renderTable(); saveData();
+}
+function deleteMember() {
+  if (!confirm("削除しますか？")) return;
+  const targetName = members[editingMemberIndex]; members.splice(editingMemberIndex, 1);
+  Object.keys(absences).forEach(date => { absences[date] = absences[date].filter(n => n !== targetName); });
+  closeAllModals(); renderMembers(); renderTable(); saveData();
+}
+
+/* --- セットリスト --- */
+function dropToSetlist(e) { e.preventDefault(); if (dragData?.type === "new") { setlist.push(dragData.songId); renderSetlist(); saveData(); } }
+function renderSetlist() {
+  const area = document.getElementById("setlistArea");
+  area.innerHTML = setlist.length ? "" : '<div class="placeholder-text no-print">曲リストからドラッグ</div>';
+  setlist.forEach((songId, index) => {
+    const song = songs.find(s => s.id === songId); if (!song) return;
+    const div = document.createElement("div"); div.className = "setlist-item"; div.draggable = true;
+    div.style.background = song.color; div.style.color = getContrastYIQ(song.color);
+    div.innerHTML = `<span>${index+1}. ${song.name}</span><button class="delete-btn no-print" onclick="removeFromSetlist(${index})">×</button>`;
+    div.ondragstart = (e) => { dragData = { type: "reorder", index: index }; e.target.classList.add('dragging'); };
+    div.ondragend = (e) => e.target.classList.remove('dragging');
+    div.ondragover = (e) => {
+      e.preventDefault(); const draggingItem = document.querySelector('.dragging');
+      if (draggingItem && draggingItem !== div) {
+        const rect = div.getBoundingClientRect(); const next = (e.clientY - rect.top) > (rect.height / 2);
+        area.insertBefore(draggingItem, next ? div.nextSibling : div);
+      }
+    };
+    div.ondrop = (e) => {
+      e.preventDefault(); if (dragData.type === "reorder") {
+        const newIndex = Array.from(area.children).indexOf(document.querySelector('.dragging'));
+        const item = setlist.splice(dragData.index, 1)[0]; setlist.splice(newIndex, 0, item);
+        renderSetlist(); saveData();
+      }
+    };
+    area.appendChild(div);
+  });
+}
+function removeFromSetlist(index) { setlist.splice(index, 1); renderSetlist(); saveData(); }
+
+/* --- スケジュール表 --- */
+function addPracticeDay() {
+  const date = dateInput.value, slots = parseInt(slotInput.value); if (!date || !slots) return;
+  if (!schedule[date]) { practiceDays.push({ date, slots }); schedule[date] = new Array(slots).fill(null); absences[date] = []; }
+  if (slots > maxSlots) maxSlots = slots;
+  renderTable(); saveData();
+}
+function deletePracticeDay(date) {
+  if (!confirm(`${date.replace(/-/g, '/')} のデータを削除しますか？`)) return;
+  practiceDays = practiceDays.filter(d => d.date !== date); delete schedule[date]; delete absences[date];
+  maxSlots = practiceDays.length > 0 ? Math.max(...practiceDays.map(d => d.slots)) : 0;
+  renderTable(); saveData();
+}
+function renderTable() {
+  const container = document.getElementById("tableContainer"); container.innerHTML = "";
+  if (!practiceDays.length) return;
+  const table = document.createElement("table");
+  const header = document.createElement("tr"); header.innerHTML = "<th>コマ</th>";
+  practiceDays.forEach(d => {
+    const th = document.createElement("th");
+    th.innerHTML = `${d.date.slice(5)}<button class="day-delete-btn no-print" onclick="deletePracticeDay('${d.date}')" title="削除">×</button><br><button class="no-print" onclick="openAbs('${d.date}')" style="font-size:10px; cursor:pointer;">欠席登録</button>`;
+    header.appendChild(th);
+  });
+  table.appendChild(header);
+  const baseTime = startTimeInput.value || "09:00";
+  for (let i = 0; i < maxSlots; i++) {
+    const tr = document.createElement("tr");
+    const timeRange = getTimeRangeString(baseTime, i);
+    tr.innerHTML = `<td style="background:#f0f0f0; font-weight:bold;">${i + 1}<span class="slot-time">${timeRange}</span></td>`;
+    practiceDays.forEach(d => {
+      const td = document.createElement("td");
+      if (i >= d.slots) td.className = "unavailable";
+      else { td.dataset.date = d.date; td.dataset.slot = i; td.ondragover = e => e.preventDefault(); td.ondrop = handleDrop; }
+      tr.appendChild(td);
+    });
+    table.appendChild(tr);
+  }
+  const absRow = document.createElement("tr");
+  absRow.innerHTML = `<td style="background:#fff0f0; font-weight:bold; color:#d33;">欠席</td>`;
+  practiceDays.forEach(d => {
+    const td = document.createElement("td"); td.style.color = "red"; td.style.fontWeight = "bold"; td.style.fontSize = "12px";
+    td.textContent = absences[d.date]?.join(", ") || ""; absRow.appendChild(td);
+  });
+  table.appendChild(absRow);
+  container.appendChild(table);
+  drawBlocks();
+}
+function drawBlocks() {
+  document.querySelectorAll("td[data-date]").forEach(td => { td.style.display = ""; td.rowSpan = 1; td.innerHTML = ""; });
+  practiceDays.forEach(d => {
+    const dayData = schedule[d.date]; let i = 0;
+    while (i < dayData.length) {
+      if (dayData[i] === null) { i++; continue; }
+      const songId = dayData[i], sIdx = i; let len = 1;
+      while (i + len < dayData.length && dayData[i + len] === songId) len++;
+      const cell = document.querySelector(`td[data-date="${d.date}"][data-slot="${i}"]`);
+      if (cell) {
+        cell.rowSpan = len;
+        const song = songs.find(s => s.id === songId);
+        if (song) {
+          const block = document.createElement("div"); block.className = "song-block"; block.textContent = song.name;
+          block.style.background = song.color; block.style.color = getContrastYIQ(song.color);
+          block.draggable = true; block.ondragover = e => e.preventDefault(); block.ondrop = handleDrop;
+          block.oncontextmenu = e => { e.preventDefault(); deleteBlock(d.date, sIdx, len); };
+          block.ondragstart = (e) => { dragData = { type: "move", songId, fromDate: d.date, start: sIdx, length: len, isCopy: e.altKey }; };
+          cell.appendChild(block);
+        }
+        for (let k = 1; k < len; k++) {
+          const h = document.querySelector(`td[data-date="${d.date}"][data-slot="${i + k}"]`); if (h) h.style.display = "none";
+        }
+      }
+      i += len;
+    }
+  });
+}
+function handleDrop(e) {
+  e.preventDefault(); if (!dragData || dragData.type === "reorder") return;
+  const td = e.currentTarget.closest('td'); let slot = parseInt(td.dataset.slot);
+  if (td.rowSpan > 1) { const rect = td.getBoundingClientRect(); slot += Math.floor((e.clientY - rect.top) / (rect.height / td.rowSpan)); }
+  if (dragData.type === "new") { updateScheduleWithSplit(td.dataset.date, slot, dragData.songId); }
+  else if (dragData.type === "move") {
+    if (!dragData.isCopy) { for (let i = 0; i < dragData.length; i++) schedule[dragData.fromDate][dragData.start + i] = null; }
+    updateScheduleWithSplit(td.dataset.date, slot, dragData.songId);
+  }
+  dragData = null; renderTable(); saveData();
+}
+function updateScheduleWithSplit(date, slot, id) {
+  const day = schedule[date], ex = day[slot];
+  if (ex && ex !== id) {
+    let s = slot; while (s > 0 && day[s-1] === ex) s--;
+    let e = slot; while (e < day.length-1 && day[e+1] === ex) e++;
+    for (let i = s; i <= e; i++) day[i] = (i === slot) ? id : ex;
+  } else { day[slot] = id; }
+}
+function deleteBlock(date, start, len) { for (let i = 0; i < len; i++) schedule[date][start + i] = null; renderTable(); saveData(); }
+
+/* --- その他 --- */
+function clearStageInfo() { if (confirm("消去しますか？")) { stageNameInput.value = ""; eventDateInput.value = ""; updateStageInfo(); } }
+function clearSchedule() { if (confirm("すべて消去しますか？")) { practiceDays = []; schedule = {}; absences = {}; maxSlots = 0; renderTable(); saveData(); } }
+function openAbs(date) {
+  currentAbsDate = date; const list = document.getElementById("absenceList");
+  list.innerHTML = members.length ? "" : "先にメンバーを追加してください";
+  members.forEach(m => {
+    const label = document.createElement("label"); label.style.display = "block"; label.style.padding = "5px";
+    const cb = document.createElement("input"); cb.type = "checkbox"; cb.value = m; cb.checked = absences[date]?.includes(m);
+    label.appendChild(cb); label.append(" " + m); list.appendChild(label);
+  });
+  absenceModal.style.display = "block"; modalOverlay.style.display = "block";
+}
+function saveAbsence() { absences[currentAbsDate] = [...document.querySelectorAll("#absenceList input:checked")].map(cb => cb.value); closeAllModals(); renderTable(); saveData(); }
+function closeAllModals() { document.querySelectorAll(".modal, .modal-overlay").forEach(el => el.style.display = "none"); }
+function getContrastYIQ(hex) {
+  if (!hex || hex[0] !== '#') return 'white';
+  const r = parseInt(hex.substr(1, 2), 16), g = parseInt(hex.substr(3, 2), 16), b = parseInt(hex.substr(5, 2), 16);
+  return ((r * 299) + (g * 587) + (b * 114)) / 1000 >= 190 ? 'black' : 'white';
+}
+document.getElementById("songInput").addEventListener("keydown", e => e.key === "Enter" && addSong());
+document.getElementById("memberInput").addEventListener("keydown", e => e.key === "Enter" && addMember());
+</script>
+</body>
+</html>
