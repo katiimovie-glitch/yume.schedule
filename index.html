@@ -2,6 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ゆめ太鼓 練習管理</title>
 <style>
 /* --- 基本レイアウト (画面表示) --- */
@@ -80,6 +81,46 @@ th:first-child { width: 80px; }
   .slot-time { font-size: 9px; }
   .song-block { border: none; margin: 0; padding: 0; width: 100%; height: 100%; }
 }
+/* --- スマホ閲覧用最適化 (PC版には影響しません) --- */
+@media screen and (max-width: 768px) {
+  .container {
+    flex-direction: column; /* 横並びを縦並びに変更 */
+    gap: 10px;
+  }
+
+  .sidebar-left, .sidebar-middle, .main-content {
+    width: 100%; /* 全幅表示 */
+    min-width: 0;
+  }
+
+  /* スマホでは入力エリアを少しコンパクトに */
+  .section-card {
+    padding: 10px;
+    margin-bottom: 10px;
+  }
+
+  /* スケジュール表を指でスクロールしやすくする */
+  .table-wrapper {
+    -webkit-overflow-scrolling: touch;
+    overflow-x: auto;
+    padding: 5px;
+  }
+
+  table {
+    min-width: 500px; /* 表が潰れすぎないように最低幅を確保 */
+  }
+
+  th, td {
+    height: 50px; /* タップはしないが、視認性のために高さを確保 */
+    font-size: 13px;
+  }
+
+  /* スマホ閲覧時に不要な説明文などを非表示にする（任意） */
+  .placeholder-text {
+    display: none;
+  }
+}
+  
 </style>
 </head>
 <body>
@@ -457,3 +498,4 @@ document.getElementById("memberInput").addEventListener("keydown", e => e.key ==
 </body>
 
 </html>
+
