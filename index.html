@@ -225,7 +225,7 @@ function importJSON(e) {
 }
 
 function updateStageInfo() {
-  displayStageName.textContent = stageNameInput.value.trim() || "和太鼓 練習管理";
+  displayStageName.textContent = stageNameInput.value.trim() || "ゆめ太鼓 練習管理";
   const date = eventDateInput.value;
   displayEventDate.textContent = date ? `本番日: ${date.replace(/-/g, '/')}` : "";
   saveData();
@@ -457,4 +457,5 @@ document.getElementById("memberInput").addEventListener("keydown", e => e.key ==
 </body>
 
 </html>
+
 
